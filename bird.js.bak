@@ -1,0 +1,101 @@
+class Bird {
+  constructor(lFoot, rFoot, height) {
+    this.lFoot = lFoot;
+    this.rFoot = rFoot;
+    this.height = height;
+    this.head = null;
+    this.lKnee = null;
+    this.rKnee = null;
+    this.queue = [];
+    this.#update();
+    this.legLength = distance(this.lFoot, this.head) * 1.36;
+    this.#update();
+  }
+
+  #update() {
+    let changed = false;
+    if (this.queue.length > 0) {
+      const info = this.queue.shift();
+      this.lFoot = info.lFoot;
+      this.rFoot = info.rFoot;
+      this.head = info.head;
+      changed = true;
+    }
+
+    if (this.legLength) {
+      this.lKnee = this.#getKnee(this.head, this.lFoot);
+      this.rKnee = this.#getKnee(this.head, this.rFoot, Math.PI);
+    } else {
+      this.head = average(this.lFoot, this.rFoot);
+      this.head.y -= this.height;
+      this.lKnee = average(this.lFoot, this.head);
+      this.rKnee = average(this.rFoot, this.head);
+    }
+
+    return changed;
+  }
+
+  #getKnee(head, foot, angleOffset = 0) {
+    const center = average(foot, head);
+    const angle = Math.atan2(foot.y - head.y, foot.x - head.x);
+    const base = distance(foot, head);
+    const heightAbsoluteAngle = angle + Math.PI / 2 + angleOffset;
+    const height = Math.sqrt((this.legLength / 2) ** 2 - (base / 2) ** 2);
+    return {
+      x: center.x + Math.cos(heightAbsoluteAngle) * height,
+      y: center.y + Math.sin(heightAbsoluteAngle) * height,
+    };
+  }
+
+  moveTo(lFoot, rFoot, doBounce = false, frameCount = 40) {
+    for (let i = 1; i <= frameCount; i++) {
+      const t = i / frameCount;
+      const u = Math.sin(t * Math.PI);
+
+      const w = doBounce ? t * 1.5 - 0.5 : t;
+
+      const frame = {
+        lFoot: vLerp(this.lFoot, lFoot, Math.max(0, w)),
+        rFoot: vLerp(this.rFoot, rFoot, Math.max(0, w)),
+      };
+      if (doBounce) {
+        frame.lFoot.y -= Math.max(0, w) * u * this.legLength * 0.3;
+        frame.rFoot.y -= Math.max(0, w) * u * this.legLength * 0.3;
+      }
+      frame["head"] = average(frame.lFoot, frame.rFoot);
+      frame["head"].y -= this.height;
+      if (doBounce) {
+        const v = easeInOutBack(t);
+        frame["head"].y -= v * this.legLength * 0.28;
+      }
+      this.queue.push(frame);
+    }
+    if (doBounce) {
+      this.queue.push(this.queue[this.queue.length - 1]);
+      this.queue.push(this.queue[this.queue.length - 1]);
+      this.queue.push(this.queue[this.queue.length - 1]);
+      this.queue.push(this.queue[this.queue.length - 1]);
+    }
+  }
+
+  draw(ctx) {
+    const changed = this.#update();
+    ctx.beginPath();
+    const radius = 10;
+    ctx.fillStyle = "black";
+    ctx.arc(this.head.x, this.head.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(this.head.x, this.head.y);
+    ctx.lineTo(this.lKnee.x, this.lKnee.y);
+    ctx.lineTo(this.lFoot.x, this.lFoot.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(this.head.x, this.head.y);
+    ctx.lineTo(this.rKnee.x, this.rKnee.y);
+    ctx.lineTo(this.rFoot.x, this.rFoot.y);
+    ctx.stroke();
+
+    return changed;
+  }
+}
